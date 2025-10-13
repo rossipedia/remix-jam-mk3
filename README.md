@@ -5,6 +5,11 @@
 >
 > Soooooo yeah. This is the Remix v3 demo but with an editable pattern and a
 > 128 band analyzer.
+>
+> https://github.com/user-attachments/assets/ecb32a5b-c60b-492b-af93-39b2506f48ed
+
+
+
 
 Check out our demo:
 
