@@ -1,0 +1,23 @@
+{
+  "name": "remix-jam-demo",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@remix-run/dom": "jam",
+    "@remix-run/events": "jam",
+    "@remix-run/fetch-router": "*",
+    "@remix-run/node-fetch-server": "*"
+  },
+  "scripts": {
+    "dev:browser": "esbuild app/public/**/*.tsx --outdir=dist --bundle --minify --splitting --format=esm --outbase=app/public --entry-names='[dir]/[name]' --chunk-names='chunks/[name]-[hash]' --sourcemap --watch",
+    "dev:server": "tsx watch server.tsx",
+    "dev": "concurrently \"pnpm dev:browser\" \"pnpm dev:server\"",
+    "start": "tsx server.tsx"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.25.10",
+    "tsx": "^4.20.6"
+  }
+}
