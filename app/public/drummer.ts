@@ -23,6 +23,7 @@ export class Drummer extends EventTarget {
   private current16th = 0;
   private nextNoteTime = 0;
   private intervalId: number | null = null;
+  private patterns: Record<Instrument, boolean[]>;
 
   // Scheduler settings
   private readonly lookaheadMs = 25; // how frequently to check (ms)
@@ -37,9 +38,17 @@ export class Drummer extends EventTarget {
   static tempoChange = tempoChange;
   static change = change;
 
-  constructor(tempoBpm: number = 90) {
+  constructor(
+    tempoBpm: number = 90,
+    patterns: Record<Instrument, boolean[]> = {
+      hihat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0].map(Boolean),
+      snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0].map(Boolean),
+      kicks: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0].map(Boolean),
+    }
+  ) {
     super();
     this.tempoBpm = tempoBpm;
+    this.patterns = patterns;
   }
 
   get isPlaying() {
@@ -206,12 +215,6 @@ export class Drummer extends EventTarget {
     this.dispatchEvent(createHat());
     this.dispatchEvent(createChange());
   }
-
-  private patterns: Record<Instrument, boolean[]> = {
-    hihat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0].map(Boolean),
-    snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0].map(Boolean),
-    kicks: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0].map(Boolean),
-  };
 
   getTrack(drum: Instrument): boolean[] {
     return this.patterns[drum];
