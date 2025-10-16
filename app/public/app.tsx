@@ -7,9 +7,41 @@ import { Drummer, type Instrument } from "./drummer.ts";
 import { tempoTap } from "./tempo-event.ts";
 
 function DrumMachine(this: Remix.Handle<Drummer>) {
-  let drummer = new Drummer(120);
+  let drummer: Drummer;
 
-  events(drummer, [Drummer.change(() => this.update())]);
+  let initialBpm = parseFloat(
+    new URLSearchParams(window.location.search).get("bpm") || "120"
+  );
+  let initialPatterns = new URLSearchParams(window.location.search).get(
+    "patterns"
+  );
+  if (initialPatterns && initialPatterns.length === 48) {
+    let values = initialPatterns.split("");
+    drummer = new Drummer(initialBpm, {
+      hihat: values.slice(0, 16).map((v) => v === "1"),
+      snare: values.slice(16, 32).map((v) => v === "1"),
+      kicks: values.slice(32, 48).map((v) => v === "1"),
+    });
+  } else {
+    drummer = new Drummer(initialBpm);
+  }
+
+  events(drummer, [
+    Drummer.change(() => {
+      this.update();
+
+      let url = `?bpm=${drummer.bpm}&patterns=`;
+      url += drummer
+        .getTrack("hihat")
+        .map((v) => (v ? "1" : "0"))
+        .concat(
+          drummer.getTrack("snare").map((v) => (v ? "1" : "0")),
+          drummer.getTrack("kicks").map((v) => (v ? "1" : "0"))
+        )
+        .join("");
+      window.history.replaceState({}, "", url);
+    }),
+  ]);
 
   events(document, [
     space(() => {
