@@ -1,6 +1,13 @@
 import { connect, createRoot, disconnect, type Remix } from "@remix-run/dom";
 import { events } from "@remix-run/events";
-import { arrowDown, arrowUp, space } from "@remix-run/events/key";
+import {
+  arrowDown,
+  arrowLeft,
+  arrowRight,
+  arrowUp,
+  escape,
+  space,
+} from "@remix-run/events/key";
 import { press } from "@remix-run/events/press";
 import { Button, ControlGroup, Layout, TempoButton } from "./components.tsx";
 import { Drummer, type Instrument } from "./drummer.ts";
@@ -10,10 +17,11 @@ function DrumMachine(this: Remix.Handle<Drummer>) {
   let drummer: Drummer;
 
   let initialBpm = parseFloat(
-    new URLSearchParams(window.location.search).get("bpm") || "120"
+    new URLSearchParams(window.location.search).get("bpm") || "120",
   );
+
   let initialPatterns = new URLSearchParams(window.location.search).get(
-    "patterns"
+    "patterns",
   );
   if (initialPatterns && initialPatterns.length === 48) {
     let values = initialPatterns.split("");
@@ -26,22 +34,31 @@ function DrumMachine(this: Remix.Handle<Drummer>) {
     drummer = new Drummer(initialBpm);
   }
 
+  function updateUrl() {
+    let url = `?bpm=${drummer.bpm}&patterns=`;
+    url += drummer
+      .getTrack("hihat")
+      .map((v) => (v ? "1" : "0"))
+      .concat(
+        drummer.getTrack("snare").map((v) => (v ? "1" : "0")),
+        drummer.getTrack("kicks").map((v) => (v ? "1" : "0")),
+      )
+      .join("");
+    window.history.replaceState({}, "", url);
+  }
+
   events(drummer, [
     Drummer.change(() => {
       this.update();
 
-      let url = `?bpm=${drummer.bpm}&patterns=`;
-      url += drummer
-        .getTrack("hihat")
-        .map((v) => (v ? "1" : "0"))
-        .concat(
-          drummer.getTrack("snare").map((v) => (v ? "1" : "0")),
-          drummer.getTrack("kicks").map((v) => (v ? "1" : "0"))
-        )
-        .join("");
-      window.history.replaceState({}, "", url);
+      updateUrl();
     }),
   ]);
+
+  // update the URL when the component is mounted to clear out any bad url state
+  this.queueTask(() => {
+    updateUrl();
+  });
 
   events(document, [
     space(() => {
@@ -52,6 +69,12 @@ function DrumMachine(this: Remix.Handle<Drummer>) {
     }),
     arrowDown(() => {
       drummer.setTempo(drummer.bpm - 1);
+    }),
+    arrowLeft(() => {
+      drummer.setTempo(drummer.bpm - 1);
+    }),
+    arrowRight(() => {
+      drummer.setTempo(drummer.bpm + 1);
     }),
   ]);
 
@@ -91,8 +114,6 @@ export function Analyzer(this: Remix.Handle) {
     for (let i = 0, l = data.byteLength; i < l; ++i) {
       const volume = (data[i] / 255) * 2.5; // normalize to byte values
       const barHeight = HEIGHT * volume;
-      // const r = (volume) * 100;
-      // const g = 100 - volume;
       drawing.fillStyle = `rgb(${volume * 100} ${100 - volume * 2.5} 0)`;
 
       drawing.fillRect(x, HEIGHT - barHeight / 2, barWidth, barHeight);
@@ -103,12 +124,10 @@ export function Analyzer(this: Remix.Handle) {
   return (
     <div
       css={{
-        // display: "flex",
         background: "black",
         borderRadius: "24px",
         padding: "24px",
         height: 452,
-        // gap: "4px",
       }}
     >
       <canvas
@@ -159,7 +178,7 @@ function DrumControls(this: Remix.Handle) {
         disabled={drummer.isPlaying}
         on={[
           connect((event) => (play = event.currentTarget)),
-          press((event) => {
+          press(() => {
             drummer.play();
             this.queueTask(() => {
               stop.focus();
@@ -244,6 +263,11 @@ function TempoDisplay(this: Remix.Handle) {
           height: "100%",
           justifyContent: "space-between",
         }}
+        // prevent the space bar from playing/stopping the drum machine
+        on={space((event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        })}
       >
         <TempoButton
           css={{ borderTopRightRadius: "24px" }}
@@ -265,7 +289,15 @@ function TempoDisplay(this: Remix.Handle) {
 }
 
 function Patterns(this: Remix.Handle) {
-  return (
+  let trackButtons: NodeListOf<HTMLButtonElement>;
+  let focusedTrack: number = -1;
+
+  let focusTrack = (track: number) => {
+    trackButtons[track].focus();
+    focusedTrack = track;
+  };
+
+  return () => (
     <div
       css={{
         display: "flex",
@@ -274,6 +306,43 @@ function Patterns(this: Remix.Handle) {
         fontSize: "180%",
         fontWeight: "bold",
       }}
+      tabIndex={0}
+      on={[
+        connect((event) => {
+          trackButtons = event.currentTarget.querySelectorAll("button");
+        }),
+        escape((event) => {
+          event.currentTarget.focus();
+        }),
+        space((event) => {
+          event.stopPropagation();
+        }),
+        arrowLeft((event) => {
+          event.stopPropagation();
+          if (focusedTrack === null) return;
+          focusTrack((focusedTrack - 1) % trackButtons.length);
+        }),
+        arrowRight((event) => {
+          event.stopPropagation();
+          if (focusedTrack === null) return;
+          focusTrack((focusedTrack + 1) % trackButtons.length);
+        }),
+        arrowUp((event) => {
+          event.stopPropagation();
+          if (focusedTrack === null) return;
+          focusTrack(
+            (focusedTrack - trackButtons.length / 3 + trackButtons.length) %
+              trackButtons.length,
+          );
+        }),
+        arrowDown((event) => {
+          event.stopPropagation();
+          if (focusedTrack === null) return;
+          focusTrack(
+            (focusedTrack + trackButtons.length / 3) % trackButtons.length,
+          );
+        }),
+      ]}
     >
       <Track label="Hat" instrument="hihat" />
       <Track label="Snare" instrument="snare" />
@@ -284,7 +353,7 @@ function Patterns(this: Remix.Handle) {
 
 function Track(
   this: Remix.Handle,
-  { label, instrument }: { label: string; instrument: Instrument }
+  { label, instrument }: { label: string; instrument: Instrument },
 ) {
   const drummer = this.context.get(DrumMachine);
   return () => {
@@ -310,6 +379,10 @@ function Track(
             backgroundColor: "rgb(0 255 0)",
             opacity: 0.9,
           },
+          "& button:focus-visible": {
+            outline: "2px solid rgb(0 255 0)",
+            outlineOffset: "2px",
+          },
         }}
       >
         <label>{label}</label>
@@ -322,6 +395,7 @@ function Track(
                 drummer.toggleNote(instrument, note, !state);
               }),
             ]}
+            tabIndex={-1}
           >
             &#x200b;
           </button>

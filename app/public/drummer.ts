@@ -25,6 +25,10 @@ export class Drummer extends EventTarget {
   private intervalId: number | null = null;
   private patterns: Record<Instrument, boolean[]>;
 
+  // Tempo settings
+  private readonly minBpm = 30;
+  private readonly maxBpm = 300;
+
   // Scheduler settings
   private readonly lookaheadMs = 25; // how frequently to check (ms)
   private readonly scheduleAheadS = 0.1; // how far ahead to schedule (s)
@@ -44,10 +48,13 @@ export class Drummer extends EventTarget {
       hihat: [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0].map(Boolean),
       snare: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0].map(Boolean),
       kicks: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0].map(Boolean),
-    }
+    },
   ) {
     super();
-    this.tempoBpm = tempoBpm;
+    this.tempoBpm = Math.max(
+      this.minBpm,
+      Math.min(this.maxBpm, Math.floor(tempoBpm)),
+    );
     this.patterns = patterns;
   }
 
@@ -69,8 +76,8 @@ export class Drummer extends EventTarget {
 
   setTempo(bpm: number) {
     this.tempoBpm = Math.max(
-      30,
-      Math.min(300, Math.floor(bpm || this.tempoBpm))
+      this.minBpm,
+      Math.min(this.maxBpm, Math.floor(bpm || this.tempoBpm)),
     );
     this.dispatchEvent(createTempoChange({ detail: this.tempoBpm }));
     this.dispatchEvent(createChange());
