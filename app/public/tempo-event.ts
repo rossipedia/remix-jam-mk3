@@ -10,6 +10,7 @@ let tempoTap = createInteraction<HTMLElement, number>(
     let resetTimer: number;
 
     let handleTap = () => {
+
       let now = Date.now();
       clearTimeout(resetTimer);
       taps.push(now);

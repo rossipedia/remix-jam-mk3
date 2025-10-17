@@ -6,14 +6,9 @@ export function Layout({ children }: { children: Remix.RemixNode }) {
   return (
     <div
       css={{
-        boxSizing: "border-box",
-        "& *": {
-          boxSizing: "border-box",
-        },
         display: "flex",
         flexDirection: "column",
         gap: "58px",
-        width: 980,
         margin: "6rem auto",
         background: "#2D2D2D",
         color: "white",
@@ -23,6 +18,7 @@ export function Layout({ children }: { children: Remix.RemixNode }) {
     >
       <header
         css={{
+          gridArea: "header",
           display: "flex",
           justifyContent: "space-between",
         }}
@@ -57,10 +53,10 @@ export function ControlGroup({ children, css, ...rest }: Remix.Props<"div">) {
       css={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
-        gridTemplateRows: "1fr 1fr",
+        gridTemplateRows: "8rem 8rem",
         gap: "24px",
-        alignItems: "center",
-        justifyContent: "center",
+        alignItems: "stretch",
+        justifyContent: "stretch",
         ...css,
       }}
     >
@@ -76,12 +72,10 @@ export function Button({ children, ...rest }: Remix.Props<"button">) {
       css={{
         all: "unset",
         letterSpacing: 1.25,
-        height: 160,
-        display: "flex",
-        alignItems: "end",
+        textAlign: 'left',
+        paddingLeft: '2rem',
         background: "#666",
         borderRadius: "24px",
-        padding: "42px",
         fontSize: "24px",
         fontWeight: 700,
         "&:disabled": {
@@ -95,30 +89,6 @@ export function Button({ children, ...rest }: Remix.Props<"button">) {
       {children}
     </button>
   );
-}
-
-export type DecayGenerator = Generator<number, number, number>;
-
-export function createExponentialDecayGenerator(
-  halfLifeMs: number,
-  startValue: number,
-  startMs: number
-): DecayGenerator {
-  const localEpsilon = 0.001;
-  function* decay(): Generator<number, number, number> {
-    let value = startValue;
-    let lastMs = startMs;
-    while (value > localEpsilon) {
-      const input = yield value;
-      const nowMs = typeof input === "number" ? input : performance.now();
-      const deltaMs = Math.max(0, nowMs - lastMs);
-      lastMs = nowMs;
-      const decayFactor = Math.pow(0.5, deltaMs / halfLifeMs);
-      value = value * decayFactor;
-    }
-    return 0;
-  }
-  return decay();
 }
 
 export function Triangle({
@@ -135,8 +105,8 @@ export function Triangle({
       aria-label={label}
       viewBox="0 0 10 10"
       css={{
-        width: 18,
-        height: 18,
+        width: "18px",
+        height: "18px",
       }}
     >
       <polygon points={orientation === "up" ? up : down} fill="currentColor" />

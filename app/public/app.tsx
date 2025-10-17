@@ -109,7 +109,9 @@ export function Analyzer(this: Remix.Handle) {
       return;
     }
 
-    const barWidth = WIDTH / data.byteLength;
+    // subtract 1 * byteLength because we're puttin a pixel of space between
+    // each band
+    const barWidth = Math.round((WIDTH - data.byteLength) / data.byteLength);
     let x = 0;
     for (let i = 0, l = data.byteLength; i < l; ++i) {
       const volume = (data[i] / 255) * 2.5; // normalize to byte values
@@ -117,17 +119,18 @@ export function Analyzer(this: Remix.Handle) {
       drawing.fillStyle = `rgb(${volume * 100} ${100 - volume * 2.5} 0)`;
 
       drawing.fillRect(x, HEIGHT - barHeight / 2, barWidth, barHeight);
-      x += barWidth + 1;
+      x += barWidth + 1; // <- extra pixel
     }
   }
 
   return (
     <div
       css={{
+        gridArea: "spec",
         background: "black",
         borderRadius: "24px",
         padding: "24px",
-        height: 452,
+        height: "452px",
       }}
     >
       <canvas
@@ -165,6 +168,7 @@ function DrumControls(this: Remix.Handle) {
       }}
     >
       <Button
+        css={{ display: "grid", placeContent: "center" }}
         on={[
           tempoTap((event) => {
             drummer.play(event.detail);
@@ -214,49 +218,55 @@ function TempoDisplay(this: Remix.Handle) {
         display: "flex",
         flexDirection: "row",
         gap: "10px",
-        alignItems: "flex-end",
-        height: 160,
+        alignItems: "center",
       }}
     >
       <div
         css={{
+          display: 'flex',
           height: "100%",
-          display: "flex",
           flex: 1,
           background: "#0B1B05",
           color: "#64C146",
-          padding: "42px",
           borderTopLeftRadius: "24px",
           borderBottomLeftRadius: "24px",
-          alignItems: "end",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         <div
           css={{
-            fontSize: "24px",
-            fontWeight: 700,
-            width: "33%",
+            display: "flex",
+            alignItems: "baseline",
+            gap: "2rem",
           }}
         >
-          BPM
-        </div>
-        <div
-          css={{
-            flex: 1,
-            fontSize: "92px",
-            fontWeight: 700,
-            position: "relative",
-            top: 22,
-            textAlign: "right",
-            fontFamily: "JetBrains Mono, monospace",
-          }}
-        >
-          {drummer.bpm}
+          <div
+            css={{
+              fontSize: "24px",
+              fontWeight: 700,
+            }}
+          >
+            BPM
+          </div>
+          <div
+            css={{
+              // flex: 1,
+              fontSize: "72px",
+              fontWeight: 700,
+              // position: "relative",
+              // top: "22px",
+              textAlign: "right",
+              fontFamily: "JetBrains Mono, monospace",
+            }}
+          >
+            {drummer.bpm}
+          </div>
         </div>
       </div>
       <div
         css={{
-          width: 75,
+          width: "75px",
           display: "flex",
           flexDirection: "column",
           gap: "12px",
@@ -300,9 +310,10 @@ function Patterns(this: Remix.Handle) {
   return () => (
     <div
       css={{
+        gridArea: "pat",
         display: "flex",
         flexDirection: "column",
-        gap: "8px",
+        gap: "0.5rem",
         fontSize: "180%",
         fontWeight: "bold",
       }}
@@ -370,6 +381,7 @@ function Track(
             border: "none",
             borderRadius: "2px",
             cursor: "pointer",
+            userSelect: 'none',
           },
           "& button.off": {
             backgroundColor: "white",

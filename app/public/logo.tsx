@@ -1,3 +1,5 @@
+import type { Remix } from "@remix-run/dom";
+
 export function Logo() {
   return (
     <svg height="86" viewBox="0 0 400 143" fill="none" xmlns="http://www.w3.org/2000/svg">
