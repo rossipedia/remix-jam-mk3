@@ -28,7 +28,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubunt-latest
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
