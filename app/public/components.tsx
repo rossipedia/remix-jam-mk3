@@ -1,6 +1,5 @@
 import type { Remix } from "@remix-run/dom";
 import { Logo } from "./logo";
-import type { EventDescriptor } from "@remix-run/events";
 
 export function Layout({ children }: { children: Remix.RemixNode }) {
   return (
@@ -37,7 +36,7 @@ export function Layout({ children }: { children: Remix.RemixNode }) {
           }}
         >
           REMIX 3<br />
-          DRUM MACHINE
+          DRUM MACHINE Mk III
         </div>
       </header>
 
@@ -72,8 +71,8 @@ export function Button({ children, ...rest }: Remix.Props<"button">) {
       css={{
         all: "unset",
         letterSpacing: 1.25,
-        textAlign: 'left',
-        paddingLeft: '2rem',
+        textAlign: "left",
+        paddingLeft: "2rem",
         background: "#666",
         borderRadius: "24px",
         fontSize: "24px",

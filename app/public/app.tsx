@@ -1,5 +1,5 @@
 import { connect, createRoot, disconnect, type Remix } from "@remix-run/dom";
-import { events } from "@remix-run/events";
+import { dom, events } from "@remix-run/events";
 import {
   arrowDown,
   arrowLeft,
@@ -12,51 +12,42 @@ import { press } from "@remix-run/events/press";
 import { Button, ControlGroup, Layout, TempoButton } from "./components.tsx";
 import { Drummer, type Instrument } from "./drummer.ts";
 import { tempoTap } from "./tempo-event.ts";
+import { debounce } from "es-toolkit/function";
 
 function DrumMachine(this: Remix.Handle<Drummer>) {
-  let drummer: Drummer;
+  // Load from URL
+  const searchParams = new URLSearchParams(window.location.search);
+  let initialBpm = parseFloat(searchParams.get("bpm") || "120");
+  let drummer = new Drummer(initialBpm);
 
-  let initialBpm = parseFloat(
-    new URLSearchParams(window.location.search).get("bpm") || "120",
-  );
-
-  let initialPatterns = new URLSearchParams(window.location.search).get(
-    "patterns",
-  );
-  if (initialPatterns && initialPatterns.length === 48) {
-    let values = initialPatterns.split("");
-    drummer = new Drummer(initialBpm, {
-      hihat: values.slice(0, 16).map((v) => v === "1"),
-      snare: values.slice(16, 32).map((v) => v === "1"),
-      kicks: values.slice(32, 48).map((v) => v === "1"),
-    });
-  } else {
-    drummer = new Drummer(initialBpm);
+  let initialPatterns = searchParams.get("patterns");
+  if (initialPatterns) {
+    drummer.deserialize(initialPatterns);
   }
 
-  function updateUrl() {
-    let url = `?bpm=${drummer.bpm}&patterns=`;
-    url += drummer
-      .getTrack("hihat")
-      .map((v) => (v ? "1" : "0"))
-      .concat(
-        drummer.getTrack("snare").map((v) => (v ? "1" : "0")),
-        drummer.getTrack("kicks").map((v) => (v ? "1" : "0")),
-      )
-      .join("");
-    window.history.replaceState({}, "", url);
-  }
+  const updateUrl = debounce(
+    () => {
+      window.history.replaceState(
+        {},
+        "",
+        `?${new URLSearchParams({
+          bpm: String(drummer.bpm),
+          patterns: drummer.serialize(),
+        })}`
+      );
+    },
+    250,
+  );
 
   events(drummer, [
-    Drummer.change(() => {
+    Drummer.change(async () => {
       this.update();
-
       updateUrl();
     }),
   ]);
 
   // update the URL when the component is mounted to clear out any bad url state
-  this.queueTask(() => {
+  this.queueTask(async () => {
     updateUrl();
   });
 
@@ -95,6 +86,30 @@ export function Analyzer(this: Remix.Handle) {
   let canvas: HTMLCanvasElement;
   let drawing: CanvasRenderingContext2D;
 
+  let gradientRect: OffscreenCanvas;
+
+  function initCanvas() {
+    drawing = canvas.getContext("2d", {})!;
+    const { width: WIDTH, height: HEIGHT } = canvas;
+
+    // Create our gradient in an offscreen canvas so we can blit
+    // from it
+    gradientRect = new OffscreenCanvas(WIDTH, HEIGHT);
+    const context = gradientRect.getContext("2d")!;
+    const gradient = context.createLinearGradient(0, 0, 0, HEIGHT);
+    /**
+     * 0deg = red
+     * 60deg = yellow
+     * 120deg = green
+     */
+    gradient.addColorStop(0.0, "hwb(0deg 0% 0%)"); // red
+    gradient.addColorStop(0.3, "hwb(45deg 0% 0%)"); // red
+    gradient.addColorStop(1.0, "hwb(120deg 0% 0%)"); // green
+
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, WIDTH, HEIGHT);
+  }
+
   let pendingRender: number;
   function render() {
     pendingRender = requestAnimationFrame(render);
@@ -109,16 +124,25 @@ export function Analyzer(this: Remix.Handle) {
       return;
     }
 
-    // subtract 1 * byteLength because we're puttin a pixel of space between
+    // subtract byteLength - 1 because we're puttin a pixel of space between
     // each band
-    const barWidth = Math.round((WIDTH - data.byteLength) / data.byteLength);
+    const barWidth = (WIDTH - (data.byteLength - 1)) / data.byteLength;
     let x = 0;
     for (let i = 0, l = data.byteLength; i < l; ++i) {
-      const volume = (data[i] / 255) * 2.5; // normalize to byte values
-      const barHeight = HEIGHT * volume;
-      drawing.fillStyle = `rgb(${volume * 100} ${100 - volume * 2.5} 0)`;
-
-      drawing.fillRect(x, HEIGHT - barHeight / 2, barWidth, barHeight);
+      const volume = data[i] / 255; // normalize to byte values
+      const barHeight = Math.round(HEIGHT * volume);
+      const y = HEIGHT - barHeight;
+      drawing.drawImage(
+        gradientRect,
+        x,
+        y,
+        barWidth,
+        barHeight,
+        x,
+        y,
+        barWidth,
+        barHeight
+      );
       x += barWidth + 1; // <- extra pixel
     }
   }
@@ -137,14 +161,14 @@ export function Analyzer(this: Remix.Handle) {
         on={[
           connect((event) => {
             canvas = event.currentTarget;
-            drawing = canvas.getContext("2d", {})!;
+            initCanvas();
             render();
           }),
           disconnect(() => {
             cancelAnimationFrame(pendingRender);
           }),
         ]}
-        width="804"
+        width="814"
         height="404"
       />
     </div>
@@ -153,10 +177,6 @@ export function Analyzer(this: Remix.Handle) {
 
 function DrumControls(this: Remix.Handle) {
   let drummer = this.context.get(DrumMachine);
-  let stop: HTMLButtonElement;
-  let play: HTMLButtonElement;
-
-  events(drummer, [Drummer.change(() => this.update())]);
 
   return () => (
     <ControlGroup
@@ -179,32 +199,22 @@ function DrumControls(this: Remix.Handle) {
       </Button>
       <TempoDisplay />
       <Button
-        disabled={drummer.isPlaying}
         on={[
-          connect((event) => (play = event.currentTarget)),
-          press(() => {
-            drummer.play();
-            this.queueTask(() => {
-              stop.focus();
-            });
+          dom.click(() => {
+            drummer.toggle();
           }),
         ]}
       >
-        PLAY
+        {drummer.isPlaying ? "STOP" : "PLAY"}
       </Button>
       <Button
-        disabled={!drummer.isPlaying}
         on={[
-          connect((event) => (stop = event.currentTarget)),
           press(() => {
-            drummer.stop();
-            this.queueTask(() => {
-              play.focus();
-            });
+            drummer.reset();
           }),
         ]}
       >
-        STOP
+        RESET
       </Button>
     </ControlGroup>
   );
@@ -223,7 +233,7 @@ function TempoDisplay(this: Remix.Handle) {
     >
       <div
         css={{
-          display: 'flex',
+          display: "flex",
           height: "100%",
           flex: 1,
           background: "#0B1B05",
@@ -343,14 +353,14 @@ function Patterns(this: Remix.Handle) {
           if (focusedTrack === null) return;
           focusTrack(
             (focusedTrack - trackButtons.length / 3 + trackButtons.length) %
-              trackButtons.length,
+              trackButtons.length
           );
         }),
         arrowDown((event) => {
           event.stopPropagation();
           if (focusedTrack === null) return;
           focusTrack(
-            (focusedTrack + trackButtons.length / 3) % trackButtons.length,
+            (focusedTrack + trackButtons.length / 3) % trackButtons.length
           );
         }),
       ]}
@@ -364,7 +374,7 @@ function Patterns(this: Remix.Handle) {
 
 function Track(
   this: Remix.Handle,
-  { label, instrument }: { label: string; instrument: Instrument },
+  { label, instrument }: { label: string; instrument: Instrument }
 ) {
   const drummer = this.context.get(DrumMachine);
   return () => {
@@ -381,15 +391,7 @@ function Track(
             border: "none",
             borderRadius: "2px",
             cursor: "pointer",
-            userSelect: 'none',
-          },
-          "& button.off": {
-            backgroundColor: "white",
-            opacity: 0.2,
-          },
-          "& button.on": {
-            backgroundColor: "rgb(0 255 0)",
-            opacity: 0.9,
+            userSelect: "none",
           },
           "& button:focus-visible": {
             outline: "2px solid rgb(0 255 0)",
@@ -398,20 +400,59 @@ function Track(
         }}
       >
         <label>{label}</label>
-        {pattern.map((state, note) => (
-          <button
-            type="button"
-            class={state ? "on" : "off"}
-            on={[
-              press(() => {
-                drummer.toggleNote(instrument, note, !state);
-              }),
-            ]}
-            tabIndex={-1}
-          >
-            &#x200b;
-          </button>
-        ))}
+        {pattern.map((volume, note) => {
+          let buttonHue = "120"; // green
+          let opacity = (volume / 80) * 0.5 + 0.4;
+          if (volume > 80) {
+            // move back towards hue 0 (red)
+            buttonHue = String(120 - ((volume - 80) / 20) * 120);
+          }
+          return (
+            <button
+              type="button"
+              style={
+                volume
+                  ? {
+                      backgroundColor: `hwb(${buttonHue}deg 0% 0% / ${opacity})`,
+                    }
+                  : { backgroundColor: `hwb(0 100% 0% / 0.2)` }
+              }
+              title={`Volume: ${volume}`}
+              on={[
+                dom.click(() => {
+                  drummer.toggleNote(instrument, note, !volume);
+                }),
+                dom.wheel((e: WheelEvent) => {
+                  if (e.shiftKey) {
+                    e.preventDefault();
+
+                    drummer.adjustNoteVolume(
+                      instrument,
+                      note,
+                      e.deltaX < 0 ? -1 : 1
+                    );
+                  }
+                }),
+                arrowUp((e) => {
+                  if (e.detail.originalEvent.shiftKey) {
+                    e.stopPropagation();
+                    drummer.adjustNoteVolume(instrument, note, 1);
+                  }
+                }),
+                arrowDown((e) => {
+                  if (e.detail.originalEvent.shiftKey) {
+                    e.stopPropagation();
+                    drummer.adjustNoteVolume(instrument, note, -1);
+                  }
+                }),
+              ]}
+              tabIndex={-1}
+            >
+              {/* &#x200b; */}
+              {volume}
+            </button>
+          );
+        })}
       </div>
     );
   };

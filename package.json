@@ -1,12 +1,13 @@
 {
-  "name": "remix-jam-demo",
+  "name": "remix-jam-mk3",
   "private": true,
   "type": "module",
   "dependencies": {
     "@remix-run/dom": "jam",
     "@remix-run/events": "jam",
     "@remix-run/fetch-router": "*",
-    "@remix-run/node-fetch-server": "*"
+    "@remix-run/node-fetch-server": "*",
+    "es-toolkit": "^1.40.0"
   },
   "scripts": {
     "dev": "vite dev",
